@@ -22,11 +22,11 @@ st.subheader("Criando Relatórios Claros e Impactantes com Dados")
 @st.cache_data
 def load_data():
     base_path = os.path.dirname(__file__)
-    file_path = os.path.join(base_path, "data.csv")
+    file_path = os.path.join(base_path, "Data.csv")
 
     if os.path.exists(file_path):
         df = pd.read_csv(file_path)
-        source = "Arquivo local (data.csv)"
+        source = "Arquivo local (Data.csv)"
     else:
         df = None
         source = None
