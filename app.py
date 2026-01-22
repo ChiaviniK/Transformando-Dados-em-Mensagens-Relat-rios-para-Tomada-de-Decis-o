@@ -86,7 +86,7 @@ col_poluente = st.sidebar.selectbox(
     df.columns
 )
 
-# Conversão de data
+# Conversão de data (segura)
 df[col_data] = pd.to_datetime(df[col_data], errors="coerce")
 
 # -------------------------------------------------
@@ -98,23 +98,29 @@ regioes = st.sidebar.multiselect(
     default=df[col_regiao].dropna().unique()
 )
 
-df_filtrado = df[df[col_regiao].isin(regioes)]
+df_filtrado = df[df[col_regiao].isin(regioes)].copy()
 
 # -------------------------------------------------
-# Análise temporal
+# Análise temporal (CORRIGIDA)
 # -------------------------------------------------
 st.header("📈 Tendência Temporal da Poluição")
 
+# Coluna auxiliar de período (evita conflitos)
+df_filtrado["_periodo"] = (
+    df_filtrado[col_data]
+    .dt.to_period("M")
+    .dt.to_timestamp()
+)
+
 df_time = (
     df_filtrado
-    .dropna(subset=[col_data, col_poluente])
-    .groupby(pd.Grouper(key=col_data, freq="M"))[col_poluente]
+    .dropna(subset=["_periodo", col_poluente])
+    .groupby("_periodo", as_index=False)[col_poluente]
     .mean()
-    .reset_index()
 )
 
 fig1, ax1 = plt.subplots()
-sns.lineplot(data=df_time, x=col_data, y=col_poluente, ax=ax1)
+sns.lineplot(data=df_time, x="_periodo", y=col_poluente, ax=ax1)
 ax1.set_title("Evolução média da poluição ao longo do tempo")
 ax1.set_xlabel("Data")
 ax1.set_ylabel("Poluição média")
@@ -157,7 +163,7 @@ if not df_regiao.empty:
 - A região com **maior concentração média** de poluentes é **{regiao_critica}**.
 - O valor médio mais elevado registrado foi **{valor_critico:.2f}**.
 
-Esses resultados indicam a necessidade de **ações direcionadas** e **monitoramento contínuo**.
+Esses resultados reforçam a importância de **ações direcionadas** e **monitoramento contínuo**.
 """)
 else:
     st.warning("Não foi possível gerar insights com os filtros selecionados.")
@@ -175,7 +181,7 @@ em **linguagem clara**, voltado a **gestores públicos não técnicos**.
 st.text_area(
     "Relatório (2 parágrafos):",
     height=180,
-    placeholder="Exemplo: A análise dos dados dos últimos anos indica que..."
+    placeholder="Exemplo: A análise dos dados indica que..."
 )
 
 # -------------------------------------------------
