@@ -40,9 +40,9 @@ df, source = load_data()
 # Upload opcional (fallback)
 # -------------------------------------------------
 if df is None:
-    st.warning("⚠️ Arquivo data.csv não encontrado na raiz do projeto.")
+    st.warning("⚠️ Arquivo Data.csv não encontrado na raiz do projeto.")
     uploaded_file = st.file_uploader(
-        "Envie o arquivo data.csv para iniciar a análise",
+        "Envie o arquivo Data.csv para iniciar a análise",
         type="csv"
     )
 
@@ -86,7 +86,7 @@ col_poluente = st.sidebar.selectbox(
     df.columns
 )
 
-# Conversão de data (segura)
+# Conversão segura da data
 df[col_data] = pd.to_datetime(df[col_data], errors="coerce")
 
 # -------------------------------------------------
@@ -101,11 +101,25 @@ regioes = st.sidebar.multiselect(
 df_filtrado = df[df[col_regiao].isin(regioes)].copy()
 
 # -------------------------------------------------
-# Análise temporal (CORRIGIDA)
+# DOWNLOAD DO CSV (NOVA FUNCIONALIDADE)
+# -------------------------------------------------
+st.sidebar.markdown("---")
+st.sidebar.subheader("⬇️ Exportar dados")
+
+csv_download = df_filtrado.to_csv(index=False).encode("utf-8")
+
+st.sidebar.download_button(
+    label="Baixar dados filtrados (CSV)",
+    data=csv_download,
+    file_name="dados_filtrados.csv",
+    mime="text/csv"
+)
+
+# -------------------------------------------------
+# Análise temporal
 # -------------------------------------------------
 st.header("📈 Tendência Temporal da Poluição")
 
-# Coluna auxiliar de período (evita conflitos)
 df_filtrado["_periodo"] = (
     df_filtrado[col_data]
     .dt.to_period("M")
@@ -169,7 +183,7 @@ else:
     st.warning("Não foi possível gerar insights com os filtros selecionados.")
 
 # -------------------------------------------------
-# Escrita do relatório (atividade pedagógica)
+# Escrita do relatório
 # -------------------------------------------------
 st.header("✍️ Escrita do Relatório")
 
