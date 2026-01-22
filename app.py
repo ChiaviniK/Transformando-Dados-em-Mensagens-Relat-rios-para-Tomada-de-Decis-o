@@ -1,85 +1,130 @@
+import os
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# -----------------------------
-# Configurações iniciais
-# -----------------------------
+# -------------------------------------------------
+# Configuração da página
+# -------------------------------------------------
 st.set_page_config(
-    page_title="Qualidade do Ar - Análise e Relatórios",
+    page_title="Do Dado à Decisão",
+    page_icon="📊",
     layout="wide"
 )
 
-st.title("🌫️ Análise da Qualidade do Ar")
-st.subheader("Exploração de dados para apoiar decisões públicas")
+st.title("📊 Do Dado à Decisão")
+st.subheader("Criando Relatórios Claros e Impactantes com Dados")
 
-# -----------------------------
-# Carregamento dos dados
-# -----------------------------
+# -------------------------------------------------
+# Função para carregar dados
+# -------------------------------------------------
 @st.cache_data
 def load_data():
-    return pd.read_csv("data.csv")
+    base_path = os.path.dirname(__file__)
+    file_path = os.path.join(base_path, "data.csv")
 
-df = load_data()
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+        source = "Arquivo local (data.csv)"
+    else:
+        df = None
+        source = None
 
-st.success("Dados carregados com sucesso!")
+    return df, source
 
-# -----------------------------
+
+df, source = load_data()
+
+# -------------------------------------------------
+# Upload opcional (fallback)
+# -------------------------------------------------
+if df is None:
+    st.warning("⚠️ Arquivo data.csv não encontrado na raiz do projeto.")
+    uploaded_file = st.file_uploader(
+        "Envie o arquivo data.csv para iniciar a análise",
+        type="csv"
+    )
+
+    if uploaded_file is None:
+        st.stop()
+    else:
+        df = pd.read_csv(uploaded_file)
+        source = "Arquivo enviado pelo usuário"
+
+st.success(f"Dados carregados com sucesso — fonte: **{source}**")
+
+# -------------------------------------------------
 # Visão geral
-# -----------------------------
-st.header("📊 Visão Geral dos Dados")
+# -------------------------------------------------
+st.header("📋 Visão Geral dos Dados")
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Registros", df.shape[0])
+col2.metric("Variáveis", df.shape[1])
+col3.metric("Valores ausentes", int(df.isna().sum().sum()))
+
 st.dataframe(df.head())
 
-st.markdown(f"""
-- **Número de registros:** {df.shape[0]}
-- **Número de variáveis:** {df.shape[1]}
-""")
+# -------------------------------------------------
+# Sidebar – seleção de colunas
+# -------------------------------------------------
+st.sidebar.header("🎛️ Configuração da Análise")
 
-# -----------------------------
-# Sidebar - Filtros
-# -----------------------------
-st.sidebar.header("🎛️ Filtros")
+col_data = st.sidebar.selectbox(
+    "Selecione a coluna de data",
+    df.columns
+)
 
-# Ajuste os nomes conforme seu CSV
-col_data = st.sidebar.selectbox("Coluna de data:", df.columns)
-df[col_data] = pd.to_datetime(df[col_data])
+col_regiao = st.sidebar.selectbox(
+    "Selecione a coluna de região",
+    df.columns
+)
 
-col_regiao = st.sidebar.selectbox("Coluna de região:", df.columns)
-col_poluente = st.sidebar.selectbox("Coluna de poluente:", df.columns)
+col_poluente = st.sidebar.selectbox(
+    "Selecione a coluna de poluição",
+    df.columns
+)
 
+# Conversão de data
+df[col_data] = pd.to_datetime(df[col_data], errors="coerce")
+
+# -------------------------------------------------
+# Filtro por região
+# -------------------------------------------------
 regioes = st.sidebar.multiselect(
-    "Selecione as regiões:",
-    df[col_regiao].unique(),
-    default=df[col_regiao].unique()
+    "Filtrar regiões",
+    options=df[col_regiao].dropna().unique(),
+    default=df[col_regiao].dropna().unique()
 )
 
 df_filtrado = df[df[col_regiao].isin(regioes)]
 
-# -----------------------------
+# -------------------------------------------------
 # Análise temporal
-# -----------------------------
+# -------------------------------------------------
 st.header("📈 Tendência Temporal da Poluição")
 
 df_time = (
     df_filtrado
+    .dropna(subset=[col_data, col_poluente])
     .groupby(pd.Grouper(key=col_data, freq="M"))[col_poluente]
     .mean()
     .reset_index()
 )
 
-fig, ax = plt.subplots()
-sns.lineplot(data=df_time, x=col_data, y=col_poluente, ax=ax)
-ax.set_title("Evolução média da poluição ao longo do tempo")
-ax.set_xlabel("Data")
-ax.set_ylabel("Nível médio de poluição")
+fig1, ax1 = plt.subplots()
+sns.lineplot(data=df_time, x=col_data, y=col_poluente, ax=ax1)
+ax1.set_title("Evolução média da poluição ao longo do tempo")
+ax1.set_xlabel("Data")
+ax1.set_ylabel("Poluição média")
 
-st.pyplot(fig)
+st.pyplot(fig1)
 
-# -----------------------------
+# -------------------------------------------------
 # Comparação entre regiões
-# -----------------------------
-st.header("🏙️ Comparação entre Regiões")
+# -------------------------------------------------
+st.header("🏙️ Poluição Média por Região")
 
 df_regiao = (
     df_filtrado
@@ -90,36 +135,53 @@ df_regiao = (
 
 fig2, ax2 = plt.subplots()
 df_regiao.plot(kind="bar", ax=ax2)
-ax2.set_title("Média de poluição por região")
 ax2.set_ylabel("Poluição média")
+ax2.set_xlabel("Região")
+ax2.set_title("Comparação entre regiões")
 
 st.pyplot(fig2)
 
-# -----------------------------
-# Insights para Relatórios
-# -----------------------------
-st.header("📝 Insights para Relatórios")
+# -------------------------------------------------
+# Insights automáticos
+# -------------------------------------------------
+st.header("🧠 Insights para Relatórios")
 
-regiao_critica = df_regiao.idxmax()
-valor_critico = df_regiao.max()
+if not df_regiao.empty:
+    regiao_critica = df_regiao.idxmax()
+    valor_critico = df_regiao.max()
 
-st.markdown(f"""
-**Principais insights gerados automaticamente:**
+    st.markdown(f"""
+### Principais conclusões:
 
-- A poluição apresenta **variações sazonais claras**, com picos ao longo do tempo analisado.
-- A região com **maior nível médio de poluição** é **{regiao_critica}**.
+- Observa-se **variação temporal significativa** nos níveis de poluição analisados.
+- A região com **maior concentração média** de poluentes é **{regiao_critica}**.
 - O valor médio mais elevado registrado foi **{valor_critico:.2f}**.
+
+Esses resultados indicam a necessidade de **ações direcionadas** e **monitoramento contínuo**.
+""")
+else:
+    st.warning("Não foi possível gerar insights com os filtros selecionados.")
+
+# -------------------------------------------------
+# Escrita do relatório (atividade pedagógica)
+# -------------------------------------------------
+st.header("✍️ Escrita do Relatório")
+
+st.markdown("""
+Use os gráficos e insights acima para escrever um relatório curto,
+em **linguagem clara**, voltado a **gestores públicos não técnicos**.
 """)
 
-st.info("Esses insights devem ser traduzidos em linguagem clara para gestores públicos não técnicos.")
-
-# -----------------------------
-# Área de reflexão
-# -----------------------------
-st.header("💡 Reflexão Final")
-
 st.text_area(
-    "Escreva um parágrafo de relatório baseado nos dados:",
-    height=150,
-    placeholder="Exemplo: Os dados indicam que..."
+    "Relatório (2 parágrafos):",
+    height=180,
+    placeholder="Exemplo: A análise dos dados dos últimos anos indica que..."
+)
+
+# -------------------------------------------------
+# Rodapé
+# -------------------------------------------------
+st.markdown("---")
+st.caption(
+    "Aula prática – Do Dado à Decisão | Visualização, Análise e Comunicação de Dados"
 )
